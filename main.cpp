@@ -6,6 +6,7 @@
 #include <pspkernel.h>
 #include <pspdebug.h>
 #include <pspdisplay.h>
+#include <pspiofilemgr.h>
 #include <sys/stat.h>
 
 PSP_MODULE_INFO("PSP fstat demo", 0, 1, 0);
@@ -79,40 +80,63 @@ void printStatInfo(const struct stat& sb)
     pspDebugScreenPrintf("=== END ===\n");
 }
 
+void printSceStatInfo(SceIoStat& stat)
+{
+    #define pspDebug pspDebugScreenPrintf
+    pspDebug("=== BEGIN sceIoGetstat ===\n");
+    pspDebug("stat.st_mode:                   0x%08x\n", stat.st_mode);
+    pspDebug("stat.st_mode (IO Access Mode):  ");
+    switch (stat.st_mode & FIO_S_IFMT) {
+        case FIO_S_IFLNK:  pspDebug("Symbolic link\n");            break;
+        case FIO_S_IFDIR:  pspDebug("Directory\n");                break;
+        case FIO_S_IFREG:  pspDebug("Regular file\n");             break;
+        default:           pspDebug("unknown?\n");                 break;
+    }
+    pspDebug("stat.st_attr:                   0x%08x\n", stat.st_attr);
+    pspDebug("stat.st_attr (IO File Mode):    ");
+    switch (stat.st_attr & FIO_SO_IFMT) {
+        case FIO_SO_IFLNK:  pspDebug("Symbolic link\n");           break;
+        case FIO_SO_IFDIR:  pspDebug("Directory\n");               break;
+        case FIO_SO_IFREG:  pspDebug("Regular file\n");            break;
+        default:            pspDebug("unknown?\n");                break;
+    }
+    pspDebug("File size:                      %d bytes\n", stat.st_size);
+    pspDebugScreenPrintf("=== END ===\n");
+}
+
 int main(int argc, char* argv[])
 {
     setup_callbacks();
     pspDebugScreenInit();
 
-    // Open a file and print fstat results
-    FILE* file = fopen("../USRDIR/crosshair.png", "rb");
-    if (!file)
+    // PSP file stat
+    SceIoStat sceIoStat1;
+    int sceIoGetstatRes1 = sceIoGetstat("disc0:/PSP_GAME/USRDIR/crosshair.png", &sceIoStat1);
+    pspDebugScreenPrintf("sceIoGetstatRes() for \"disc0:/PSP_GAME/USRDIR/crosshair.png\"\n");
+    if (sceIoGetstatRes1 >= 0)
     {
-        pspDebugScreenPrintf("Couldn't open %s: %s", file, strerror(errno));
+        pspDebugScreenPrintf("Operation successful\n");
+        printSceStatInfo(sceIoStat1);
     }
     else
     {
-        pspDebugScreenPrintf("File found!\n");
-        struct stat st;
-
-        // fileno() - get the integer file descriptor associated with the stream:
-        //  0 - Standard input (stdin)
-        //  1 - Standard output (stdout)
-        //  2 - Standard error (stderr)
-        // ≥3 - Other opened files
-        // -1 - Error occurred
-        int filenoRes = fileno(file);
-
-
-        pspDebugScreenPrintf("filenoRes: %d\n", filenoRes);
-        int errnoRes = errno;
-        pspDebugScreenPrintf("errnoRes: %d (%s)\n", errnoRes, strerror(errnoRes));
-        fstat(filenoRes, &st);
-        printStatInfo(st);
-        fclose(file);
+        pspDebugScreenPrintf("Operation failed with response code %d\n", sceIoGetstatRes1);
+    }
+    
+    SceIoStat sceIoStat2;
+    int sceIoGetstatRes2 = sceIoGetstat("ms0:/PSP/GAME/crosshair.png", &sceIoStat2);
+    pspDebugScreenPrintf("\n\nsceIoGetstatRes() for \"ms0:/PSP/GAME/crosshair.png\"\n");
+    if (sceIoGetstatRes2 >= 0)
+    {
+        pspDebugScreenPrintf("Operation successful\n");
+        printSceStatInfo(sceIoStat2);
+    }
+    else
+    {
+        pspDebugScreenPrintf("Operation failed with response code %d\n", sceIoGetstatRes2);
     }
 
-    pspDebugScreenPrintf("\nThe program will exit in 30 seconds...");
+    pspDebugScreenPrintf("\n\nThe program will exit in 30 seconds...");
     sleep(30);
 
     return 0;
